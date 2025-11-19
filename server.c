@@ -5,11 +5,49 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <pthread.h>
+
 void error(const char *msg)
 {
     perror(msg);
     exit(1);
 }
+
+void *thread_function(void *arg) {
+    int sockfd = *((int *)arg);
+    int newsockfd;
+    socklen_t clilen;
+    struct sockaddr_in cli_addr;
+    char buffer[256];
+    int n;
+    
+    while (1)
+    {
+    
+        listen(sockfd, 5);
+        clilen = sizeof(cli_addr);
+        newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
+        if (newsockfd < 0)
+            error("ERROR on accept");
+
+        bzero(buffer, 256);
+        n = read(newsockfd, buffer, 255);
+        if (n < 0)
+            error("ERROR reading from socket");
+
+        printf("Here is the message: %s\n", buffer);
+
+        n = write(newsockfd, "I got your message", 18);
+        if (n < 0)
+            error("ERROR writing to socket");
+
+        close(newsockfd);
+        
+    }
+    return NULL;
+}
+
+
 int main(int argc, char *argv[])
 {
     int sockfd, newsockfd, portno;
@@ -17,7 +55,6 @@ int main(int argc, char *argv[])
     char buffer[256];
     struct sockaddr_in serv_addr, cli_addr;
     int n;
-
     
     if (argc < 2)
     {
@@ -39,36 +76,23 @@ int main(int argc, char *argv[])
             sizeof(serv_addr)) < 0)
     error("ERROR on binding");
 
-    while (1)
-    {
+    pthread_t thread_id;
+    pthread_t thread_id2;
 
-    listen(sockfd, 5);
+    printf("Server started on port %d\n", portno);
+
+    pthread_create(&thread_id, NULL, thread_function, &sockfd);
+    pthread_create(&thread_id2, NULL, thread_function, &sockfd);
 
 
-    clilen = sizeof(cli_addr);
-    newsockfd = accept(sockfd,
-                    (struct sockaddr *)&cli_addr,
-                    &clilen);
+    pthread_join(thread_id, NULL);
+    pthread_join(thread_id2, NULL);
+
+    printf("Thread deleted\n");
     
-    if (newsockfd < 0)
-        error("ERROR on accept");
-    
-    bzero(buffer, 256);
-    n = read(newsockfd, buffer, 255);
-    
-    if (n < 0)
-        error("ERROR reading from socket");
-    
-    printf("Here is the message: %s\n", buffer);
-    n = write(newsockfd, "I got your message", 18);
-    
-    if (n < 0)
-        error("ERROR writing to socket");
-    
-    close(newsockfd);
-        
-    }
+
     
     close(sockfd);
     return 0;
 }
+
