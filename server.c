@@ -14,36 +14,29 @@ void error(const char *msg)
 }
 
 void *thread_function(void *arg) {
-    int sockfd = *((int *)arg);
-    int newsockfd;
-    socklen_t clilen;
-    struct sockaddr_in cli_addr;
+    int newsockfd = *((int *)arg);
+
+    free(arg); 
+    
     char buffer[256];
     int n;
     
-    while (1)
-    {
-    
-        listen(sockfd, 5);
-        clilen = sizeof(cli_addr);
-        newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
-        if (newsockfd < 0)
-            error("ERROR on accept");
-
-        bzero(buffer, 256);
-        n = read(newsockfd, buffer, 255);
-        if (n < 0)
-            error("ERROR reading from socket");
-
-        printf("Here is the message: %s\n", buffer);
-
-        n = write(newsockfd, "I got your message", 18);
-        if (n < 0)
-            error("ERROR writing to socket");
-
-        close(newsockfd);
+    bzero(buffer, 256);
+    n = read(newsockfd, buffer, 255); 
+    if (n < 0) {
+        perror("ERROR reading from socket");
+    } else {
+        printf("Message from client %d: %s\n", newsockfd, buffer);
         
+        n = write(newsockfd, "I got your message", 18);
+        if (n < 0) {
+            perror("ERROR writing to socket");
+        }
     }
+
+    close(newsockfd);
+    printf("Client %d connection closed.\n", newsockfd);
+    
     return NULL;
 }
 
@@ -76,21 +69,31 @@ int main(int argc, char *argv[])
             sizeof(serv_addr)) < 0)
     error("ERROR on binding");
 
-    pthread_t thread_id;
-    pthread_t thread_id2;
+    listen(sockfd, 5);
 
     printf("Server started on port %d\n", portno);
-
-    pthread_create(&thread_id, NULL, thread_function, &sockfd);
-    pthread_create(&thread_id2, NULL, thread_function, &sockfd);
-
-
-    pthread_join(thread_id, NULL);
-    pthread_join(thread_id2, NULL);
-
-    printf("Thread deleted\n");
     
+    while (1){
+        pthread_t thread_id;
+        clilen = sizeof(cli_addr);
 
+        int *newsockfd_ptr = malloc(sizeof(int));
+        *newsockfd_ptr = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
+        
+        if (*newsockfd_ptr < 0) {
+            perror("ERROR on accept");
+            free(newsockfd_ptr);
+            continue;
+        }
+        
+        if (pthread_create(&thread_id, NULL, thread_function, newsockfd_ptr) != 0) {
+            perror("ERROR creating thread");
+            free(newsockfd_ptr);
+            close(*newsockfd_ptr);
+        }
+        
+        pthread_detach(thread_id);
+    }
     
     close(sockfd);
     return 0;
