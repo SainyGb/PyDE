@@ -8,9 +8,17 @@
 #include <pthread.h>
 
 #include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
+
 
 #define MAX_CODE_SIZE 1024
 #define MAX_OUTPUT_SIZE 4096
+#define PATH_MAX_LEN 512
+
+#define PATH_OVERHEAD 4 // for ".py" and null terminator
+#define COMMAND_OVERHEAD 14 // for "python3 " and " 2>&1" and null terminator
 
 
 void error(const char *msg)
@@ -20,12 +28,49 @@ void error(const char *msg)
 }
 
 void execute_python_code(const char *python_code, char *output_buffer){
-    char command[MAX_CODE_SIZE + 64];
+
+    FILE *code_file = NULL;
+    FILE *fp = NULL;
+
+    char temp_file[PATH_MAX_LEN];
+    char command[PATH_MAX_LEN];
+
+    snprintf(temp_file, sizeof(temp_file), "%s/temp_code_XXXXXX", P_tmpdir);
+
+    int fd = mkstemp(temp_file);
+    if (fd == -1) {
+        snprintf(output_buffer, MAX_OUTPUT_SIZE, 
+                 "SERVER ERROR: mkstemp failed (%s) on path: %s\n", strerror(errno), temp_file);
+        return;
+    }
+
+    close(fd);
+
+    char final_temp_file[PATH_MAX_LEN];
+    snprintf(final_temp_file, sizeof(final_temp_file), "%.*s.py", 
+         (int)sizeof(final_temp_file) - PATH_OVERHEAD, temp_file);
+
+    if (rename(temp_file, final_temp_file) != 0) {
+        snprintf(output_buffer, MAX_OUTPUT_SIZE, 
+                 "SERVER ERROR: rename failed (%s) on path: %s to %s\n", strerror(errno), temp_file, final_temp_file);
+        remove(temp_file);
+        return;
+    }
+
+    code_file = fopen(final_temp_file, "w");
+    if (code_file == NULL) {
+        snprintf(output_buffer, MAX_OUTPUT_SIZE, "SERVER ERROR: failed to open file (%s) on path: %s to %s\n", strerror(errno), temp_file, final_temp_file);
+        remove(final_temp_file);
+        return;
+    }
+
+    fprintf(code_file, "%s", python_code);
+    fclose(code_file);
 
     snprintf(command, sizeof(command),
-             "python3 -c '%s' 2>&1", python_code);
+         "python3 %.*s 2>&1", (int)sizeof(command) - COMMAND_OVERHEAD, final_temp_file);
     
-    FILE *fp = popen(command, "r");
+    fp = popen(command, "r");
     if (fp == NULL) {
         snprintf(output_buffer, MAX_OUTPUT_SIZE, "SERVER ERROR: Failed to run command\n");
         return;
@@ -55,6 +100,8 @@ void execute_python_code(const char *python_code, char *output_buffer){
         snprintf(output_buffer, MAX_OUTPUT_SIZE, 
                  "(Program finished successfully with no output.)");
     }
+
+    remove(final_temp_file);
 }
 
 void *thread_function(void *arg) {
