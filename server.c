@@ -20,6 +20,8 @@
 #define PATH_OVERHEAD 4 // for ".py" and null terminator
 #define COMMAND_OVERHEAD 14 // for "python3 " and " 2>&1" and null terminator
 
+#define HEADER_SIZE 256
+
 
 void error(const char *msg)
 {
@@ -109,29 +111,52 @@ void *thread_function(void *arg) {
 
     free(arg); 
     
+    char request_buffer[MAX_CODE_SIZE];
     char code_buffer[MAX_CODE_SIZE];
     char result_buffer[MAX_OUTPUT_SIZE];
-    int n;
     
-    bzero(code_buffer, MAX_CODE_SIZE);
-    n = read(newsockfd, code_buffer, MAX_CODE_SIZE - 1); 
-    if (n < 0) {
+    bzero(request_buffer, MAX_CODE_SIZE);
+    int n = read(newsockfd, request_buffer, MAX_CODE_SIZE - 1);
+
+    if (n <= 0) {
         perror("ERROR reading from socket");
         close(newsockfd);
         return NULL;
     }
-    code_buffer[n] = '\0';
 
-    execute_python_code(code_buffer, result_buffer);
+    request_buffer[n] = '\0';
 
-    n = write(newsockfd, result_buffer, strlen(result_buffer));
-    if (n < 0){
-        perror("ERROR writing to socket");
+    char *body_start = strstr(request_buffer, "\r\n\r\n");
+
+    if (body_start == NULL) {
+        snprintf(result_buffer, MAX_OUTPUT_SIZE, "Error: Invalid HTTP request format.");
+    } else {
+        body_start += 4;
+        strncpy(code_buffer, body_start, MAX_CODE_SIZE - 1);
+        code_buffer[MAX_CODE_SIZE - 1] = '\0';
+
+        execute_python_code(code_buffer, result_buffer);
     }
 
+    char response[MAX_OUTPUT_SIZE + HEADER_SIZE ];
+
+    int content_length = strlen(result_buffer);
+
+    snprintf(response, sizeof(response),
+         "HTTP/1.1 200 OK\r\n"
+         "Content-Type: text/plain\r\n"
+         "Content-Length: %d\r\n"
+         "Connection: close\r\n"
+         "\r\n"
+         "%s",
+         content_length, result_buffer);
+
+    write(newsockfd, response, strlen(response));
+
     close(newsockfd);
+
     printf("Client %d connection closed.\n", newsockfd);
-    
+
     return NULL;
 }
 
