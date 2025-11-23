@@ -7,10 +7,54 @@
 #include <netinet/in.h>
 #include <pthread.h>
 
+#include <sys/wait.h>
+
+#define MAX_CODE_SIZE 1024
+#define MAX_OUTPUT_SIZE 4096
+
+
 void error(const char *msg)
 {
     perror(msg);
     exit(1);
+}
+
+void execute_python_code(const char *python_code, char *output_buffer){
+    char command[MAX_CODE_SIZE + 64];
+
+    snprintf(command, sizeof(command),
+             "python3 -c '%s' 2>&1", python_code);
+    
+    FILE *fp = popen(command, "r");
+    if (fp == NULL) {
+        snprintf(output_buffer, MAX_OUTPUT_SIZE, "SERVER ERROR: Failed to run command\n");
+        return;
+    }
+
+    bzero(output_buffer, MAX_OUTPUT_SIZE);
+
+    char line_buffer[256];
+    size_t current_len = 0;
+
+    while (fgets(line_buffer, sizeof(line_buffer), fp) != NULL) {
+        size_t line_len = strlen(line_buffer);
+        if (current_len + line_len < MAX_OUTPUT_SIZE - 1) {
+            strncat(output_buffer, line_buffer, line_len);
+            current_len += line_len;
+        } else {
+            strncat(output_buffer, "\n[Output truncated]\n", MAX_OUTPUT_SIZE - current_len - 1);
+            break;
+        }
+    }
+
+    int status = pclose(fp);
+
+    if (status != 0 && output_buffer[0] == '\0') {
+        snprintf(output_buffer, MAX_OUTPUT_SIZE, "Python execution failed with status %d\n", WEXITSTATUS(status));
+    } else if (status == 0 && output_buffer[0] == '\0') {
+        snprintf(output_buffer, MAX_OUTPUT_SIZE, 
+                 "(Program finished successfully with no output.)");
+    }
 }
 
 void *thread_function(void *arg) {
@@ -18,20 +62,24 @@ void *thread_function(void *arg) {
 
     free(arg); 
     
-    char buffer[256];
+    char code_buffer[MAX_CODE_SIZE];
+    char result_buffer[MAX_OUTPUT_SIZE];
     int n;
     
-    bzero(buffer, 256);
-    n = read(newsockfd, buffer, 255); 
+    bzero(code_buffer, MAX_CODE_SIZE);
+    n = read(newsockfd, code_buffer, MAX_CODE_SIZE - 1); 
     if (n < 0) {
         perror("ERROR reading from socket");
-    } else {
-        printf("Message from client %d: %s\n", newsockfd, buffer);
-        
-        n = write(newsockfd, "I got your message", 18);
-        if (n < 0) {
-            perror("ERROR writing to socket");
-        }
+        close(newsockfd);
+        return NULL;
+    }
+    code_buffer[n] = '\0';
+
+    execute_python_code(code_buffer, result_buffer);
+
+    n = write(newsockfd, result_buffer, strlen(result_buffer));
+    if (n < 0){
+        perror("ERROR writing to socket");
     }
 
     close(newsockfd);
