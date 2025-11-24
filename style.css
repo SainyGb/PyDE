@@ -1,0 +1,48 @@
+body {
+    display: flex;
+    align-items: center;
+    justify-items: center;
+    height: 100vh;
+    margin: 0 auto;
+    margin: 20px;
+}
+body > form{
+    margin: 0 auto;
+    width: 100%;
+    font-family: "Roboto", sans-serif;
+}
+.container{
+    width: 100%;
+    height: 50vh;
+    display: flex;
+    justify-content: center;
+    margin: 0 auto;
+}
+.container-ch{
+    width: 30%;
+    display: flex;
+    flex-direction: column;
+    margin: 0 10px;
+}
+.container-ch > label{
+    font-weight: bold;
+}
+.container-ch > button{
+    margin-top: 10px;
+}
+#message{
+    border: 1/2px solid #000000;
+    border-radius: 8px;
+    width: 70%;
+    height: 40%;
+    margin-right: 20px;
+}
+#output{
+    border: 1/2px solid #000000;
+    border-radius: 8px;
+    margin: 0;
+    width: 70%;
+    height: 40%;
+    padding: 10px;
+    background-color: #f0f0f0;
+}

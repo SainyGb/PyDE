@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+   <form onsubmit="event.preventDefault();api();" method="POST">
+    <div class="container">
+    <div class="container-ch">
+        <label for="message">Digite seu código:</label><br>
+        <textarea id="message" name="message" rows="5" cols="40" placeholder="Type your text here..."></textarea>
+        <button type="submit" style="width: 30%;">&#9654; Executar</button>
+    </div>
+    <div class="container-ch">
+        <label for="output">Saída</label>
+        <p id="output"></p>
+    </div>
+</div>
+  <br><br>
+
+
+</form>
+<script src="./index.js"></script>
+</body>
+</html>

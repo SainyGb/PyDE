@@ -37,6 +37,7 @@ void execute_python_code(const char *python_code, char *output_buffer){
     char temp_file[PATH_MAX_LEN];
     char command[PATH_MAX_LEN];
 
+    printf("%s\n", python_code);
     snprintf(temp_file, sizeof(temp_file), "%s/temp_code_XXXXXX", P_tmpdir);
 
     int fd = mkstemp(temp_file);
@@ -124,24 +125,27 @@ void *thread_function(void *arg) {
         return NULL;
     }
 
+    //char method[10]
+    //sscanf(request_buffer, "%s", method);
+
     request_buffer[n] = '\0';
 
     char *body_start = strstr(request_buffer, "\r\n\r\n");
-
+    printf("Received buffer:\n%s\n", request_buffer);
+    printf("Received request:\n%s\n", body_start);
     if (body_start == NULL) {
         snprintf(result_buffer, MAX_OUTPUT_SIZE, "Error: Invalid HTTP request format.");
     } else {
         body_start += 4;
         strncpy(code_buffer, body_start, MAX_CODE_SIZE - 1);
         code_buffer[MAX_CODE_SIZE - 1] = '\0';
-
         execute_python_code(code_buffer, result_buffer);
     }
 
     char response[MAX_OUTPUT_SIZE + HEADER_SIZE ];
 
     int content_length = strlen(result_buffer);
-
+    /*
     snprintf(response, sizeof(response),
          "HTTP/1.1 200 OK\r\n"
          "Content-Type: text/plain\r\n"
@@ -150,7 +154,21 @@ void *thread_function(void *arg) {
          "\r\n"
          "%s",
          content_length, result_buffer);
+    */
 
+    snprintf(response, sizeof(response),
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/plain\r\n"
+        "Content-Length: %d\r\n"
+        "Connection: close\r\n"
+        "Access-Control-Allow-Origin: *\r\n"
+        "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
+        "Access-Control-Allow-Headers: Content-Type\r\n"
+        "Content-Type: text/plain\r\n"
+        "\r\n"
+         "%s",
+    content_length, result_buffer);
+    printf("Sending response:\n%s\n", response);
     write(newsockfd, response, strlen(response));
 
     close(newsockfd);
