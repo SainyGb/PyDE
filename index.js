@@ -17,4 +17,19 @@ const api = () =>{
       .catch(error => {console.error('Error:', error)
         output.innerText = "Error: " + error;
       });}
+
+const baixarArquivo = () => {
+  const blob = new Blob([pythonScript.value], { type: 'text/plain' });
+  const fileURL = URL.createObjectURL(blob);
+  const downloadLink = document.createElement('a');
+
+  downloadLink.href = fileURL;
+
+  downloadLink.download = 'script.py';
+
+  document.body.appendChild(downloadLink);
+
+  downloadLink.click();
+  URL.revokeObjectURL(fileURL);
+}
       
