@@ -20,12 +20,12 @@ gcc server.c -o server
 
 Running the server app
 ```bash
-./server 8080
+./server 51482
 ```
 
 Testing the web app
 ```bash
-curl -X POST      -H "Content-Type: text/plain"      --data-binary 'print("O resultado eh: " + str(10*5))'      http://127.0.0.1:8080
+curl -X POST      -H "Content-Type: text/plain"      --data-binary 'print("O resultado eh: " + str(10*5))'      http://127.0.0.1:51482
 ```
 
 
